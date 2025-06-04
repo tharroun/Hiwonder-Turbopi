@@ -6,7 +6,7 @@ small_kernel   = numpy.ones((3, 3), numpy.uint8)
 medium_kernel  = numpy.ones((6, 6), numpy.uint8)
 large_kernel   = numpy.ones((9, 9), numpy.uint8)
 
-shape_list = ['heart']
+shape_list = ['moon','circle','square','arrow','flower','heart','star']
 calbiration_filename = 'calibration.yaml' 
 with open(calbiration_filename,'w') as file:
     file.close() 
@@ -26,7 +26,7 @@ for shape in shape_list :
         assert ret, "Error receiving video frame"
         
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        ret,frame_bw = cv2.threshold(frame, 55, 255, cv2.THRESH_BINARY_INV)
+        ret,frame_bw = cv2.threshold(frame, 150, 255, cv2.THRESH_BINARY_INV)
         cv2.imshow('frame_bw', frame_bw)
     
         if cv2.waitKey(10) == ord('k'):
@@ -76,8 +76,8 @@ for shape in shape_list :
     sA_avg = numpy.average(shapeAreas)
     sA_std = numpy.std(shapeAreas)
     data = {shape: \
-              {'HM_AVG': [float(sM_avg[0]),float(sM_avg[1]),float(sM_avg[2]),float(sM_avg[3])], \
-               'HM_STD': [float(sM_std[0]),float(sM_std[1]),float(sM_std[2]),float(sM_std[3])], \
+              {'HM_AVG': [float(sM_avg[0]),float(sM_avg[1]),float(sM_avg[2]),float(sM_avg[3]),float(sM_avg[4]),float(sM_avg[5]),float(sM_avg[6])], \
+               'HM_STD': [float(sM_std[0]),float(sM_std[1]),float(sM_std[2]),float(sM_std[3]),float(sM_std[4]),float(sM_std[5]),float(sM_std[6])], \
                'AREA_AVG': [float(sA_avg)],
                'AREA_STD': [float(sA_std)]}}
     with open(calbiration_filename,'a') as file:
