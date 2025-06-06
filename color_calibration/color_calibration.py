@@ -1,6 +1,7 @@
 import numpy
 import yaml
 import cv2
+import time
 
 color_list = ['pink','red','orange','yellow','green','blue','light_blue','purple','brown']
 calbiration_filename = 'calibration.yaml' 
@@ -8,15 +9,34 @@ with open(calbiration_filename,'w') as file:
     file.close() 
 
 for color in color_list :
-    print(f"Place color: {color}")
     #cap = cv2.VideoCapture(0,cv2.CAP_V4L2)
-    cap = cv2.VideoCapture(1,cv2.CAP_MSMF)
-    cap.set(cv2.CAP_PROP_FPS, 30.0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-
+    cap = cv2.VideoCapture(2,cv2.CAP_DSHOW)
     assert cap.isOpened(), "Error opening camera."
 
+    #cap.set(cv2.CAP_PROP_FPS, 30.0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_SATURATION,20)
+    cap.set(cv2.CAP_PROP_BRIGHTNESS,5)
+    cap.set(cv2.CAP_PROP_CONTRAST,25)
+    cap.set(cv2.CAP_PROP_GAIN,-1.0)
+
+    '''
+    print("CV_CAP_PROP_FRAME_WIDTH: '{}'".format(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
+    print("CV_CAP_PROP_FRAME_HEIGHT : '{}'".format(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    print("CAP_PROP_FPS : '{}'".format(cap.get(cv2.CAP_PROP_FPS)))
+    print("CAP_PROP_POS_MSEC : '{}'".format(cap.get(cv2.CAP_PROP_POS_MSEC)))
+    print("CAP_PROP_FRAME_COUNT  : '{}'".format(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
+    print("CAP_PROP_BRIGHTNESS : '{}'".format(cap.get(cv2.CAP_PROP_BRIGHTNESS)))
+    print("CAP_PROP_CONTRAST : '{}'".format(cap.get(cv2.CAP_PROP_CONTRAST)))
+    print("CAP_PROP_SATURATION : '{}'".format(cap.get(cv2.CAP_PROP_SATURATION)))
+    print("CAP_PROP_HUE : '{}'".format(cap.get(cv2.CAP_PROP_HUE)))
+    print("CAP_PROP_GAIN  : '{}'".format(cap.get(cv2.CAP_PROP_GAIN)))
+    print("CAP_PROP_CONVERT_RGB : '{}'".format(cap.get(cv2.CAP_PROP_CONVERT_RGB)))
+    '''
+
+
+    print(f"Place color: {color}")
     while True:
         ret, frame = cap.read()
         assert ret, "Error receiving video frame"

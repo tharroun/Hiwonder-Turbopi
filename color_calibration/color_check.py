@@ -6,12 +6,30 @@ calbiration_filename = 'calibration.yaml'
 with open(calbiration_filename,'r') as file:
         color_ranges = yaml.safe_load(file)
 
-cap = cv2.VideoCapture(1,cv2.CAP_MSMF)
-cap.set(cv2.CAP_PROP_FPS, 30.0)
+cap = cv2.VideoCapture(2,cv2.CAP_DSHOW)
+assert cap.isOpened(), "Error opening camera."
+
+#cap.set(cv2.CAP_PROP_FPS, 30.0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+cap.set(cv2.CAP_PROP_SATURATION,20)
+cap.set(cv2.CAP_PROP_BRIGHTNESS,5)
+cap.set(cv2.CAP_PROP_CONTRAST,25)
+cap.set(cv2.CAP_PROP_GAIN,-1.0)
 
-assert cap.isOpened(), "Error opening camera."
+'''
+    print("CV_CAP_PROP_FRAME_WIDTH: '{}'".format(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
+    print("CV_CAP_PROP_FRAME_HEIGHT : '{}'".format(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    print("CAP_PROP_FPS : '{}'".format(cap.get(cv2.CAP_PROP_FPS)))
+    print("CAP_PROP_POS_MSEC : '{}'".format(cap.get(cv2.CAP_PROP_POS_MSEC)))
+    print("CAP_PROP_FRAME_COUNT  : '{}'".format(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
+    print("CAP_PROP_BRIGHTNESS : '{}'".format(cap.get(cv2.CAP_PROP_BRIGHTNESS)))
+    print("CAP_PROP_CONTRAST : '{}'".format(cap.get(cv2.CAP_PROP_CONTRAST)))
+    print("CAP_PROP_SATURATION : '{}'".format(cap.get(cv2.CAP_PROP_SATURATION)))
+    print("CAP_PROP_HUE : '{}'".format(cap.get(cv2.CAP_PROP_HUE)))
+    print("CAP_PROP_GAIN  : '{}'".format(cap.get(cv2.CAP_PROP_GAIN)))
+    print("CAP_PROP_CONVERT_RGB : '{}'".format(cap.get(cv2.CAP_PROP_CONVERT_RGB)))
+'''
 
 while True:
     ret, frame = cap.read()
