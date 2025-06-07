@@ -15,15 +15,13 @@ import cv2
 import hw_sdk_robot
 import hw_sdk_sonar
 import tah_sdk_mecanum
+import mypid
 #import hw_sdk_sonar
 #import hw_sdk_infrared
 
-#GREEN_MIN = numpy.array([60, 132, 32],numpy.uint8)
-#GREEN_MAX = numpy.array([84, 236, 96],numpy.uint8)
-#GREEN_MIN = numpy.array([36, 100, 10],numpy.uint8) # OPEN WORLD
-#GREEN_MAX = numpy.array([86, 255, 255],numpy.uint8)
 
-
+# -------------
+# LOAD THE COLOR DEFINITIONS
 calbiration_filename = '/home/hiwonder/Github/Hiwonder-Turbopi/color_calibration/calibration.yaml' 
 with open(calbiration_filename,'r') as file:
     color_ranges = yaml.safe_load(file)
@@ -154,171 +152,69 @@ def robot_move_0(in_q,robot) -> Enum:
 
 # ==============================================================
 def robot_move_1(in_q,robot) -> Enum:
-    kpid_x = (0.05,0.0,0.01)
-    kpid_y = (0.2,0.0,0.05)
-    kpid_R = (0.005,0.0001,0.00005)
-    integral_x = 0.0
-    integral_y = 0.0
-    integral_R = 0.0
-    previous_error_x = 0.0
-    previous_error_y = 0.0
-    previous_error_R = 0.0
+    sx = mypid(0.25,0.005,0.05)
+    sy = mypid(0.2,0.002,0.02)
+    mr = mypid(0.005,0.0001,0.00005)
+
     servo_x = servo2_center
     servo_y = servo1_center
 
     width,height = in_q.get()
     in_q.task_done()
-    print("Width: ", width, "Height: ", height)
+    assert width==640 , print("First data in queue is not the width/height.")
     cX = width/2.0
     cY = height/2.0
     
     wheels = tah_sdk_mecanum.Mecanum(robot)
     
+    dq = deque(maxlen=5)
     # --------------------------------------------------------
     while True:
         data = in_q.get()
-        if data is _sentinel:
+        dq.append(data)
+        if dq[-1] is _sentinel:
             in_q.put(_sentinel)
             wheels.reset_motors()
             robot.pwm_servo_set_position(0.3, [[1, servo1_center]]) 
-            robot.pwm_servo_set_position(0.3, [[2, servo2_center]])
+            robot.pwm_servo_set_position(0.3, [[2, servo2_center]])      
             break
-        else :
-            error = cX - data[0]
-            integral_x += error*data[3]
-            derivative = (error - previous_error_x)/data[3]
-            control = kpid_x[0] * error + kpid_x[1] * integral_x + kpid_x[2] * derivative
-            previous_error_x = error
-            position = int(servo_x + control)
-            if position < 1000 :
-                wheels.set_velocity(0,90,0.2)
-                time.sleep(0.1)
-                wheels.reset_motors()
-                position = int(servo_x - control//4)     
-            elif position > 2000:
-                wheels.set_velocity(0,90,-0.2)
-                time.sleep(0.1)
-                wheels.reset_motors()
-                position = int(servo_x - control//4)
-            robot.pwm_servo_set_position(0.3, [[2, position]]) 
-            servo_x = position
-            # ----------------------------------------------------------
-            error = cY - data[1]
-            integral_y += error*data[3]
-            derivative = (error - previous_error_y)/data[3]
-            control = kpid_y[0] * error + kpid_y[1] * integral_y + kpid_y[2] * derivative
-            previous_error_y = error
-            position = int(servo_y - control)
-            if position < 1000 or position > 2000:
-                position = servo_y
-            robot.pwm_servo_set_position(0.3, [[1, position]]) 
-            servo_y = position
-            # ----------------------------------------------------------
-            error = set_radius - data[2]
-            integral_R += error*data[3]
-            derivative = (error - previous_error_R)/data[3]
-            control = kpid_R[0] * error + kpid_R[1] * integral_R + kpid_R[2] * derivative
-            previous_error_x = error
-            #if control < 0:
-                #wheels.set_velocity(30,180,0)
-                #time.sleep(math.fabs(control)/2)
-                #wheels.reset_motors()
-            #else :
-                #wheels.set_velocity(30,0,0)
-                #time.sleep(math.fabs(control))
-                #wheels.reset_motors()
-            # ----------------------------------------------------------
-        in_q.task_done()
-    # --------------------------------------------------------
-    return Exitcode.GOOD
-
-# ==============================================================
-def robot_move_2(in_q,robot) -> Enum:
-    kpid_xs = (0.05,0.0,0.01)
-    kpid_xw = (0.005,0.00001,0.00005)
-    kpid_y = (0.2,0.0,0.05)
-    kpid_R = (0.0001,0.0,0.000002)
-    integral_xs = 0.0
-    integral_xw = 0.0
-    integral_y = 0.0
-    integral_R = 0.0
-    previous_error_xs = 0.0
-    previous_error_xw = 0.0
-    previous_error_y  = 0.0
-    previous_error_R  = 0.0
-    servo_x = servo2_center
-    servo_y = servo1_center
-
-    width,height = in_q.get()
-    in_q.task_done()
-    print("Width: ", width, "Height: ", height)
-    cX = width/2.0
-    cY = height/2.0
-    
-    wheels = tah_sdk_mecanum.Mecanum(robot)
-    
-    # --------------------------------------------------------
-    while True:
-        data = in_q.get()
-        if data is _sentinel:
-            in_q.put(_sentinel)
-            wheels.reset_motors()
-            robot.pwm_servo_set_position(0.3, [[1, servo1_center]]) 
-            robot.pwm_servo_set_position(0.3, [[2, servo2_center]])
-            break
-        else :
-            # ----------------------------------------------------------
-            error = cX - data[0]
-            integral_xs += error*data[3]
-            derivative = (error - previous_error_xs)/data[3]
-            control = kpid_xs[0] * error + kpid_xs[1] * integral_xs + kpid_xs[2] * derivative
-            previous_error_xs = error
-            position = int(servo_x + control)
-            if position < 1000 or position > 2000: position = servo_x
-            robot.pwm_servo_set_position(0.3, [[2, position]]) 
-            servo_x = position
-            # ----------------------------------------------------------
-            error = servo_x - servo2_center
-            integral_xw += error*data[3]
-            derivative = (error - previous_error_xw)/data[3]
-            control = kpid_xw[0] * error + kpid_xw[1] * integral_xw + kpid_xw[2] * derivative
-            previous_error_xw = error
-            if control<0:
-                wheels.set_velocity(0,90,0.2)
-                time.sleep(0.1)
+        if len(dq)==5:
+            dX = (dq[-1][0] - dq[0][0])/width
+            dY = (dq[-1][1] - dq[0][1])/height
+            dR = (dq[-1][2] - dq[0][2])
+            
+            if (math.fabs(dX) > 0.05) or (math.fabs(dY) > 0.05):
+                SWIVEL = True
+                MOVE = False
             else:
-                wheels.set_velocity(0,90,-0.2)
-                time.sleep(0.1)
-            wheels.reset_motors()
-            print(control,error)
+                SWIVEL = False
+                MOVE = True
             # ----------------------------------------------------------
-            error = cY - data[1]
-            integral_y += error*data[3]
-            derivative = (error - previous_error_y)/data[3]
-            control = kpid_y[0] * error + kpid_y[1] * integral_y + kpid_y[2] * derivative
-            previous_error_y = error
-            position = int(servo_y - control)
-            if position < 1000 or position > 2000:  position = servo_y
-            robot.pwm_servo_set_position(0.3, [[1, position]]) 
-            servo_y = position
+            if SWIVEL:                 
+                control = sx.pid(cX, dq[-1][0], dq[-1][3])
+                position = int(servo_x + control)
+                if position < 1000 :
+                    position = servo_x     
+                elif position > 2000:
+                    position = servo_x 
+                robot.pwm_servo_set_position(0.3, [[2, position]]) 
+                servo_x = position
+                # ----------------------------------------------------------
+                control = sx.pid(cY, dq[-1][1], dq[-1][3])
+                position = int(servo_y - control)
+                if position < 1000 or position > 2000:
+                    position = servo_y
+                robot.pwm_servo_set_position(0.3, [[1, position]]) 
+                servo_y = position
             # ----------------------------------------------------------
-            #error = set_radius - data[2]
-            #integral_R += error*data[3]
-            #derivative = (error - previous_error_R)/data[3]
-            #control = kpid_R[0] * error + kpid_R[1] * integral_R + kpid_R[2] * derivative
-            #previous_error_x = error
-            #if control < 0:
-                #wheels.set_velocity(30,180,0)
-                #time.sleep(math.fabs(control)/2)
-                #wheels.reset_motors()
-            #else :
-                #wheels.set_velocity(30,0,0)
-                #time.sleep(math.fabs(control))
-                #wheels.reset_motors()
+            if MOVE:
+                wheels.reset_motors()
             # ----------------------------------------------------------
         in_q.task_done()
     # --------------------------------------------------------
     return Exitcode.GOOD
+
+
 
 
 # ==============================================================
@@ -442,7 +338,7 @@ if __name__ == '__main__':
     test_servos(robot)
 
     q = Queue() 
-    thread_motion = threading.Thread(target=robot_move_2, args=(q,robot))
+    thread_motion = threading.Thread(target=robot_move_1, args=(q,robot))
     thread_vision = threading.Thread(target=robot_see, args=(q,))
     
     thread_motion.start()
