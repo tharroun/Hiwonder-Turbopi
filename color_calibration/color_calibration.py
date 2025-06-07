@@ -2,13 +2,14 @@ import numpy
 import yaml
 import cv2
 
-color_list = ['pink','red','orange','yellow','green','blue','light_blue','purple','brown']
+#color_list = ['pink','red','orange','yellow','green','blue','light_blue','purple','brown']
+color_list = ['red','green','blue']
 calbiration_filename = 'calibration.yaml' 
 with open(calbiration_filename,'w') as file:
     file.close() 
 
-#cap = cv2.VideoCapture(0,cv2.CAP_V4L2)
-cap = cv2.VideoCapture(0,cv2.CAP_MSMF)
+cap = cv2.VideoCapture(0,cv2.CAP_V4L2)
+#cap = cv2.VideoCapture(0,cv2.CAP_MSMF)
 assert cap.isOpened(), "Error opening camera."
 
 '''

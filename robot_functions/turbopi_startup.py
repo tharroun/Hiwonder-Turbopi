@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 # coding=utf8
 import sys
-sys.path.append('/home/hiwonder/')
+sys.path.append('/home/hiwonder/Github/Hiwonder-Turbopi')
+sys.path.append('/home/hiwonder/Github/Hiwonder-Turbopi/sdk')
 import time
 import hw_sdk_robot
 import tah_sdk_mecanum

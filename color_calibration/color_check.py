@@ -2,12 +2,12 @@ import numpy
 import yaml
 import cv2
 
-calbiration_filename = 'calibration.yaml' 
+calbiration_filename = '/home/hiwonder/Github/Hiwonder-Turbopi/color_calibration/calibration.yaml' 
 with open(calbiration_filename,'r') as file:
     color_ranges = yaml.safe_load(file)
 
-#cap = cv2.VideoCapture(0,cv2.CAP_V4L2)
-cap = cv2.VideoCapture(0,cv2.CAP_MSMF)
+cap = cv2.VideoCapture(0,cv2.CAP_V4L2)
+#cap = cv2.VideoCapture(0,cv2.CAP_MSMF)
 assert cap.isOpened(), "Error opening camera."
 
 #cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
