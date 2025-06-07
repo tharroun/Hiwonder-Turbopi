@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # coding=utf8
 import sys
-sys.path.append('/home/hiwonder/')
+sys.path.append('/home/hiwonder/Github/Hiwonder-Turbopi')
 import time
 import threading
 import math
