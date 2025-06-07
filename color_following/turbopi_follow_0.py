@@ -19,8 +19,8 @@ calbiration_filename = 'C:\\Users\\thadh\\Documents\\GitHub\\Hiwonder-Turbopi\\c
 with open(calbiration_filename,'r') as file:
     color_ranges = yaml.safe_load(file)
 
-COLOR_MIN = numpy.array(color_ranges['blue']['min'],numpy.uint8)
-COLOR_MAX = numpy.array(color_ranges['blue']['max'],numpy.uint8)
+COLOR_MIN = numpy.array(color_ranges['orange']['min'],numpy.uint8)
+COLOR_MAX = numpy.array(color_ranges['orange']['max'],numpy.uint8)
 
 small_kernel   = numpy.ones((3, 3), numpy.uint8)
 medium_kernel  = numpy.ones((6, 6), numpy.uint8)
@@ -37,8 +37,9 @@ while True:
     frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV_FULL)
 
     color_mask = cv2.inRange(frame_hsv, COLOR_MIN, COLOR_MAX)
-    color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE, small_kernel,  iterations = 1)
-    color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_OPEN,  medium_kernel, iterations = 1)
+    color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE,  medium_kernel, iterations = 1)
+    color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_OPEN,  small_kernel, iterations = 1)
+
     cv2.imshow('frame', color_mask)
 
     if cv2.waitKey(10) == ord('q'):
