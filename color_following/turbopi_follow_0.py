@@ -1,48 +1,78 @@
-#import sys
-#sys.path.append('/home/hiwonder/')
 import time
 import threading
-import math
 from queue import Queue
-from enum import Enum
-from collections import deque
-import numpy
-import cv2
-import yaml
-#import hw_sdk_robot
-#import hw_sdk_sonar
-#import tah_sdk_mecanum
-#import hw_sdk_sonar
-#import hw_sdk_infrared
 
-calbiration_filename = 'C:\\Users\\thadh\\Documents\\GitHub\\Hiwonder-Turbopi\\color_calibration\\calibration.yaml'
-with open(calbiration_filename,'r') as file:
-    color_ranges = yaml.safe_load(file)
+KILL_THREAD = object() 
 
-COLOR_MIN = numpy.array(color_ranges['orange']['min'],numpy.uint8)
-COLOR_MAX = numpy.array(color_ranges['orange']['max'],numpy.uint8)
+# ==============================================================
+def robot_servo(qs) -> int:
 
-small_kernel   = numpy.ones((3, 3), numpy.uint8)
-medium_kernel  = numpy.ones((6, 6), numpy.uint8)
-large_kernel   = numpy.ones((9, 9), numpy.uint8)
+    (x,y) = qs.get()
+    assert (x,y)==(1,2) , "ERROR MECANUM"
+    qs.task_done()
 
-cap = cv2.VideoCapture(0,cv2.CAP_MSMF)
-assert cap.isOpened(), "Error opening camera."
-time.sleep(3)
+    while True:
+        data = qs.get()
+        if data is KILL_THREAD:
+            qs.task_done()
+            break
+        print(data)
+        time.sleep(2)
+        qs.task_done()
 
-while True:
-    ret, frame = cap.read()
-    assert ret, "Error receiving video frame"
+    return 1 
+# ==============================================================
 
-    frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV_FULL)
+# ==============================================================
+def robot_mecanum(qm) -> int:
 
-    color_mask = cv2.inRange(frame_hsv, COLOR_MIN, COLOR_MAX)
-    color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE,  medium_kernel, iterations = 1)
-    color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_OPEN,  small_kernel, iterations = 1)
+    (x,y) = qm.get()
+    assert (x,y)==(1,2) , "ERROR MECANUM"
+    qm.task_done()
 
-    cv2.imshow('frame', color_mask)
+    while True:
+        data = qm.get()
+        if data is KILL_THREAD:
+            qm.task_done()
+            break
+        print(data)
+        time.sleep(2)
+        qm.task_done()
 
-    if cv2.waitKey(10) == ord('q'):
-        break
-cap.release()
-cv2.destroyAllWindows()
+    return 1 
+# ==============================================================
+
+# ==============================================================
+def robot_see(qs,qm) -> int:
+
+    qs.put((1,2))
+    qm.put((1,2))
+
+    for i in range(5):
+        qs.put(('servo',i))
+        qm.put(('mecanum',i))
+        time.sleep(1)
+ 
+    qs.put(KILL_THREAD)
+    qm.put(KILL_THREAD)
+    return 1 
+# ==============================================================
+
+if __name__ == '__main__':
+
+    qs = Queue() 
+    qm = Queue()
+
+    thread_vision = threading.Thread(target=robot_see, args=(qs,qm,))
+    thread_vision.start()
+
+    thread_servo   = threading.Thread(target=robot_servo, args=(qs,))
+    thread_mecanum = threading.Thread(target=robot_mecanum, args=(qm,))
+    thread_servo.start()
+    thread_mecanum.start()
+
+    #thread_vision.join()
+
+    qs.join()
+    qm.join()
+    print(qs.qsize(),qm.qsize())

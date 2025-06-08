@@ -78,7 +78,7 @@ def robot_move_1(in_q,robot) -> Enum:
         data = in_q.get()
         dq.append(data)
         if dq[-1] is _sentinel:
-            in_q.put(_sentinel)
+            in_q.task_done()
             wheels.reset_motors()
             robot.pwm_servo_set_position(0.3, [[1, servo1_center]]) 
             robot.pwm_servo_set_position(0.3, [[2, servo2_center]])      
@@ -145,7 +145,7 @@ def robot_move_0(in_q,robot) -> Enum:
     while True:
         data = in_q.get()
         if data is _sentinel:
-            in_q.put(_sentinel)
+            in_q.task_done()
             wheels.reset_motors()
             robot.pwm_servo_set_position(0.3, [[1, servo1_center]]) 
             robot.pwm_servo_set_position(0.3, [[2, servo2_center]])      
