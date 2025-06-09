@@ -6,6 +6,7 @@ sys.path.append('/home/hiwonder/Github/Hiwonder-Turbopi/sdk')
 import time
 import threading
 from queue import Queue
+from enum import Enum
 import yaml
 import numpy
 import mypid
@@ -13,6 +14,7 @@ import hw_sdk_robot
 import hw_sdk_sonar
 import tah_sdk_mecanum
 import cv2
+
 
 KILL_THREAD = object() 
 LOST_OBJECT = object()
@@ -33,8 +35,16 @@ servo2_center = 1500 # x (horizontal) direction
 servo1_center = 1500 # y (vertical) direction
 set_radius    = 40.0
 
+class CAMERA_ORIENTATION(Enum):
+    LEFT    = 1
+    CENTER  = 2
+    RIGHT   = 3
+looking = CAMERA_ORIENTATION.CENTER
+
+
 # ==============================================================
 def robot_servo(qs,robot) -> int:
+    global looking
 
     sx = mypid.mypid(0.15,0.0,0.005)
     sy = mypid.mypid(0.2,0.0,0.005)
@@ -58,8 +68,7 @@ def robot_servo(qs,robot) -> int:
             qs.task_done()
             break
         elif data is LOST_OBJECT:
-            robot.pwm_servo_set_position(0.3, [[1, servo1_center]])
-            robot.pwm_servo_set_position(0.3, [[2, servo2_center]])
+            pass
         else :
             move_x = sx.pid(cX, data[0], data[3])
             new_x_position = int(servo_x_position + move_x)
@@ -74,6 +83,9 @@ def robot_servo(qs,robot) -> int:
             robot.pwm_servo_set_position(0.3, [[1, new_y_position],[2, new_x_position]]) 
             servo_x_position = new_x_position
             servo_y_position = new_y_position
+            if servo_x_position > 1800 :   looking = CAMERA_ORIENTATION.RIGHT
+            elif servo_x_position < 1200 : looking = CAMERA_ORIENTATION.LEFT
+            else :                         looking = CAMERA_ORIENTATION.CENTER
         # ----------------------------------------------------------
         qs.task_done()
 
@@ -81,7 +93,9 @@ def robot_servo(qs,robot) -> int:
 # ==============================================================
 
 # ==============================================================
-def robot_mecanum(qm) -> int:
+def robot_mecanum(qm,robot) -> int:
+    global looking
+
     mr = mypid.mypid(0.0015,0.0,0.00005)
     mz = mypid.mypid(0.004,0.0,0.0001)
 
@@ -90,8 +104,8 @@ def robot_mecanum(qm) -> int:
     (width,height) = qm.get()
     qm.task_done()
     assert (width,height)==(640,480) , print("First data in servo queue is not the width/height.")
-    cX = width/2.0
-    cY = height/2.0
+    too_far_left  = 1 * width / 4
+    too_far_right = 3 * width / 4
 
     while True:
         data = qm.get()
@@ -105,14 +119,14 @@ def robot_mecanum(qm) -> int:
             wheels.reset_motors()
         else :
             # ----------------------------------------------------------
-            if data[0] < 200 :
-                control = numpy.fabs(mr.pid(200,data[0],data[3]))
+            if data[0] < too_far_left and looking==CAMERA_ORIENTATION.LEFT :
+                control = numpy.fabs(mr.pid(cX_left,data[0],data[3]))
                 control = 0.12 if control > 0.12 else control
                 wheels.set_velocity(0,90,-0.2)
                 time.sleep(control)
                 wheels.reset_motors()
-            if data[0] > 440:
-                control = numpy.fabs(mr.pid(440,data[0],data[3]))
+            if data[0] > too_far_right and looking==CAMERA_ORIENTATION.RIGHT :
+                control = numpy.fabs(mr.pid(cX_right,data[0],data[3]))
                 control = 0.12 if control > 0.12 else control
                 wheels.set_velocity(0,90,0.2)
                 time.sleep(control)
@@ -264,7 +278,7 @@ if __name__ == '__main__':
     thread_vision.start()
 
     thread_servo   = threading.Thread(target=robot_servo, args=(qs,robot))
-    thread_mecanum = threading.Thread(target=robot_mecanum, args=(qm,))
+    thread_mecanum = threading.Thread(target=robot_mecanum, args=(qm,robot))
     thread_servo.start()
     thread_mecanum.start()
 
