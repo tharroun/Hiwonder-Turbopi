@@ -597,7 +597,7 @@ if __name__ == "__main__":
                 # print(res)
             res = board.get_battery()
             if res is not None:
-                print(res)
+                print(f"Battery: {res}")
             time.sleep(0.001)
         except KeyboardInterrupt:
             break

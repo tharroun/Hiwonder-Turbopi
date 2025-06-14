@@ -63,8 +63,8 @@ def robot_servo(qs,robot) -> int:
         # ----------------------------------------------------------
         # THE TASK
         if data is KILL_THREAD:
-            robot.pwm_servo_set_position(0.3, [[1, servo1_center]])
-            robot.pwm_servo_set_position(0.3, [[2, servo2_center]])
+            robot.pwm_servo_set_position(0.05, [[1, servo1_center]])
+            robot.pwm_servo_set_position(0.05, [[2, servo2_center]])
             qs.task_done()
             break
         elif data is LOST_OBJECT:
@@ -80,11 +80,11 @@ def robot_servo(qs,robot) -> int:
             new_y_position = int(servo_y_position - move_y)
             if new_y_position < 1100 or new_y_position > 1900 : new_y_position = servo_y_position
             # ----------------------------------------------------------
-            robot.pwm_servo_set_position(0.3, [[1, new_y_position],[2, new_x_position]]) 
+            robot.pwm_servo_set_position(0.05, [[1, new_y_position],[2, new_x_position]]) 
             servo_x_position = new_x_position
             servo_y_position = new_y_position
-            if servo_x_position > 1800 :   looking = CAMERA_ORIENTATION.RIGHT
-            elif servo_x_position < 1200 : looking = CAMERA_ORIENTATION.LEFT
+            if servo_x_position > 1800 :   looking = CAMERA_ORIENTATION.LEFT
+            elif servo_x_position < 1200 : looking = CAMERA_ORIENTATION.RIGHT
             else :                         looking = CAMERA_ORIENTATION.CENTER
         # ----------------------------------------------------------
         qs.task_done()
@@ -96,7 +96,7 @@ def robot_servo(qs,robot) -> int:
 def robot_mecanum(qm,robot) -> int:
     global looking
 
-    mr = mypid.mypid(0.0015,0.0,0.00005)
+    mr = mypid.mypid(0.002,0.0,0.0001)
     mz = mypid.mypid(0.004,0.0,0.0001)
 
     wheels = tah_sdk_mecanum.Mecanum(robot)
@@ -106,6 +106,9 @@ def robot_mecanum(qm,robot) -> int:
     assert (width,height)==(640,480) , print("First data in servo queue is not the width/height.")
     too_far_left  = 1 * width / 4
     too_far_right = 3 * width / 4
+
+    #-------
+    #f = open("file.txt", "w") 
 
     while True:
         data = qm.get()
@@ -119,19 +122,20 @@ def robot_mecanum(qm,robot) -> int:
             wheels.reset_motors()
         else :
             # ----------------------------------------------------------
+
             if data[0] < too_far_left and looking==CAMERA_ORIENTATION.LEFT :
-                control = numpy.fabs(mr.pid(cX_left,data[0],data[3]))
-                control = 0.12 if control > 0.12 else control
-                wheels.set_velocity(0,90,-0.2)
-                time.sleep(control)
-                wheels.reset_motors()
+                control = numpy.fabs(mr.pid(too_far_left,data[0],data[3]))
+                if control > 2.0 : control = 2.0
+                wheels.set_velocity(0,0,-control)
+                time.sleep(0.05)
             if data[0] > too_far_right and looking==CAMERA_ORIENTATION.RIGHT :
-                control = numpy.fabs(mr.pid(cX_right,data[0],data[3]))
-                control = 0.12 if control > 0.12 else control
-                wheels.set_velocity(0,90,0.2)
-                time.sleep(control)
-                wheels.reset_motors()
+                control = numpy.fabs(mr.pid(too_far_right,data[0],data[3]))
+                if control > 2.0 : control = 2.0
+                wheels.set_velocity(0,0,control)
+                time.sleep(0.05)
+            #f.write(f"{looking},{data[0]},{data[3]}\n")
             # ----------------------------------------------------------
+            '''
             if numpy.fabs(data[2] - set_radius) > 10:
                 control = mz.pid(set_radius,data[2],data[3])
                 if control < 0 :
@@ -144,22 +148,18 @@ def robot_mecanum(qm,robot) -> int:
                     wheels.set_velocity(20,0,0.0)
                     time.sleep(control)
                     wheels.reset_motors()
+            '''
         # ----------------------------------------------------------
         qm.task_done()
-
+    
+    #-------
+    #f.close()
     wheels.reset_motors()
     return 1 
 # ==============================================================
 
 # ==============================================================
-def robot_see(qs,qm) -> int:
-
-    cap = cv2.VideoCapture(0,cv2.CAP_V4L2)
-    if not cap.isOpened():
-        print("Error opening camera")
-        qs.put(KILL_THREAD)
-        qm.put(KILL_THREAD)
-        return -1
+def robot_see(qs,qm,cap) -> int:
     
     width  = cap.get(cv2.CAP_PROP_FRAME_WIDTH )   
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT ) 
@@ -195,7 +195,8 @@ def robot_see(qs,qm) -> int:
             cx = int(M['m10']/M['m00'])
             cy = int(M['m01']/M['m00'])
             radius = int(numpy.sqrt(M['m00']/numpy.pi))
-            if circularity < 0.7 : 
+            #if circularity < 0.7 : 
+            if radius < 10 :
                 qs.put(LOST_OBJECT)
                 qm.put(LOST_OBJECT)
             else:
@@ -205,6 +206,9 @@ def robot_see(qs,qm) -> int:
             cv2.drawContours(frame,contours,0,(0,0,255),5)
             t1 = t2
             # --
+        else :
+            qs.put(LOST_OBJECT)
+            qm.put(LOST_OBJECT)
         cv2.imshow('frame', frame)
 
         if cv2.waitKey(10) == ord('q'):
@@ -213,8 +217,6 @@ def robot_see(qs,qm) -> int:
             break
 
     # When everything done, release the capture
-    cap.release()
-    cv2.destroyAllWindows()
     return 1
 # ==============================================================
 
@@ -223,9 +225,9 @@ def test_servos(robot) -> int:
     print("TESTING SERVO 1 UP/DOWN...")
     robot.pwm_servo_set_position(0.3, [[1, servo2_center]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[1, servo2_center+200]]) 
+    robot.pwm_servo_set_position(0.3, [[1, servo2_center+400]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[1, servo2_center-200]]) 
+    robot.pwm_servo_set_position(0.3, [[1, servo2_center-400]]) 
     time.sleep(0.5)
     robot.pwm_servo_set_position(0.3, [[1, servo2_center]]) 
     time.sleep(0.5)
@@ -233,9 +235,9 @@ def test_servos(robot) -> int:
     print("TESTING SERVO 2 LEFT/RIGHT...")
     robot.pwm_servo_set_position(0.3, [[2, servo2_center]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[2, servo2_center+200]]) 
+    robot.pwm_servo_set_position(0.3, [[2, servo2_center+500]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[2, servo2_center-200]]) 
+    robot.pwm_servo_set_position(0.3, [[2, servo2_center-500]]) 
     time.sleep(0.5)
     robot.pwm_servo_set_position(0.3, [[2, servo2_center]]) 
     time.sleep(0.5)
@@ -255,8 +257,8 @@ def test_sonar(sonar) -> int:
     print("TESTING SONAR...")
     sonar.setRGBMode(0)
     time.sleep(0.1)
-    sonar.setPixelColor(0, (255, 255, 255))
-    sonar.setPixelColor(1, (255, 255, 255))
+    sonar.setPixelColor(0, (100, 255, 100))
+    sonar.setPixelColor(1, (100, 255, 100))
 #    sonar.show()
     return 0
 # ==============================================================
@@ -271,10 +273,13 @@ if __name__ == '__main__':
     test_sonar(sonar)
     test_servos(robot)
 
+    cap = cv2.VideoCapture(0,cv2.CAP_V4L2)
+    assert cap.isOpened(), print("Error opening camera")
+
     qs = Queue() 
     qm = Queue()
 
-    thread_vision = threading.Thread(target=robot_see, args=(qs,qm,))
+    thread_vision = threading.Thread(target=robot_see, args=(qs,qm,cap))
     thread_vision.start()
 
     thread_servo   = threading.Thread(target=robot_servo, args=(qs,robot))
@@ -283,7 +288,9 @@ if __name__ == '__main__':
     thread_mecanum.start()
 
     thread_vision.join()
-
+    cap.release()
+    cv2.destroyAllWindows()
+    
     qs.join()
     qm.join()
     print(f"Queue Servo   : {qs.qsize()}")
