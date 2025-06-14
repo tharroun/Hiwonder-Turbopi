@@ -88,7 +88,10 @@ def robot_servo(qs,robot) -> int:
             else :                         looking = CAMERA_ORIENTATION.CENTER
         # ----------------------------------------------------------
         qs.task_done()
-
+    
+    #-------
+    robot.pwm_servo_set_position(0.05, [[1, servo1_center]])
+    robot.pwm_servo_set_position(0.05, [[2, servo2_center]])
     return 1 
 # ==============================================================
 
@@ -132,8 +135,18 @@ def robot_mecanum(qm,robot) -> int:
             direction = 0
             if numpy.fabs(data[2] - set_radius) > 10:
                 controlz = int(mz.pid(set_radius,data[2],data[3]))
-                if controlz < 0 : direction = 180
-                else : direction = 0
+                if controlz < 0 :
+                    if looking==CAMERA_ORIENTATION.LEFT :
+                        direction = 150
+                    elif looking==CAMERA_ORIENTATION.RIGHT :
+                        direction = 210
+                    else : direction = 180
+                else : 
+                    if looking==CAMERA_ORIENTATION.LEFT :
+                        direction = 30
+                    elif looking==CAMERA_ORIENTATION.RIGHT :
+                        direction = 330
+                    else : direction = 0
                 controlz = numpy.abs(controlz)
                 controlz = 40 if controlz > 40 else controlz
             # ----------------------------------------------------------
@@ -173,16 +186,17 @@ def robot_see(qs,qm,cap) -> int:
             t2 = time.perf_counter()
             if (len(contours)>1) : 
                 contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
-            # --
-            area = cv2.contourArea(contours[0])
-            arclength = cv2.arcLength(contours[0],True)
-            circularity = 4*numpy.pi*area/(arclength*arclength)
+            # ------------------------------------------------
+            #area = cv2.contourArea(contours[0])
+            #arclength = cv2.arcLength(contours[0],True)
+            #circularity = 4*numpy.pi*area/(arclength*arclength)
             # NEXT TIME:https://docs.opencv.org/4.11.0/d4/d70/tutorial_hough_circle.html
-            # --
+            # ------------------------------------------------
             M = cv2.moments(contours[0])
             cx = int(M['m10']/M['m00'])
             cy = int(M['m01']/M['m00'])
             radius = int(numpy.sqrt(M['m00']/numpy.pi))
+            # ------------------------------------------------
             #if circularity < 0.7 : 
             if radius < 10 :
                 qs.put(LOST_OBJECT)
@@ -193,7 +207,7 @@ def robot_see(qs,qm,cap) -> int:
             #cv2.circle(frame,(cx,cy),radius,(0,255,0),5)
             cv2.drawContours(frame,contours,0,(0,0,255),5)
             t1 = t2
-            # --
+            # ------------------------------------------------
         else :
             qs.put(LOST_OBJECT)
             qm.put(LOST_OBJECT)
@@ -203,8 +217,7 @@ def robot_see(qs,qm,cap) -> int:
             qs.put(KILL_THREAD)
             qm.put(KILL_THREAD)
             break
-
-    # When everything done, release the capture
+        # ------------------------------------------------
     return 1
 # ==============================================================
 
