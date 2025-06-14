@@ -41,7 +41,7 @@ class Mecanum:
         vx = velocity * math.cos(direction * rad_per_deg)
         vy = velocity * math.sin(direction * rad_per_deg)
         vp = -angular_rate * (self.a + self.b)
-        v1 = int(0.75*(vx - vy - vp)) 
+        v1 = int(vx - vy - vp)
         v2 = int(vx + vy + vp)
         v3 = int(vx + vy - vp)
         v4 = int(vx - vy + vp)
