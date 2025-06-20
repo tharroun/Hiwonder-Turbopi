@@ -77,7 +77,7 @@ def robot_servo(qs,Global,robot) -> int:
             new_y_position = int(servo_y_position - move_y)
             if new_y_position < 1100 or new_y_position > 1900 : new_y_position = servo_y_position
             # ----------------------------------------------------------
-            robot.pwm_servo_set_position(0.05, [[1, new_y_position],[2, new_x_position]]) 
+            robot.pwm_servo_set_position(0.01, [[1, new_y_position],[2, new_x_position]]) 
             servo_x_position = new_x_position
             servo_y_position = new_y_position
             if servo_x_position > 1800 :   Global.looking = CAMERA_ORIENTATION.LEFT
