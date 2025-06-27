@@ -56,6 +56,7 @@ class BoardSDK:
         :param timeout: Timeout in seconds for serial communication.
         """
         self.logger = logging.getLogger(__name__)
+        logging.basicConfig(filename='BordSDK.log', filemode='w', level=logging.INFO)
 
         try:
             self.port = serial.Serial(None, baudrate=baudrate, timeout=timeout)
@@ -64,6 +65,7 @@ class BoardSDK:
             self.port.setPort(device)
             self.port.open()
             time.sleep(0.1)
+            self.logger.info("Opened serial port.")
         except serial.SerialException as e:
             raise RuntimeError(f"Failed to initialize serial port: {e}")
         
@@ -71,19 +73,22 @@ class BoardSDK:
         Added thread to listen on the serial port
         Added queue for the data (battery) 
         """
-        if enable_recv :
-            self.enable_recv = enable_recv
-            self.listening = threading.Thread(target=self._listen_thread, daemon=True).start()
+        self.enable_recv = enable_recv
+        if enable_recv:
             self.stop_listening = False
+            self.listening = threading.Thread(target=self._listen_thread, daemon=False)
             self.frame          = []
             self.bytes_received = 0
             self.state          = FSM.START_BYTE_1
             self.queue_sys      = collections.deque(maxlen=1)
             self.queue_sys.append(0)
-
-            self.parsers = {
-                Functions.FUNC_SYS: self._packet_sys  # SYS is the battery voltage.
-            }
+            self.listening.start()
+            self.logger.info("Started listening to serial port.")
+            
+        
+        self.parsers = {
+            Functions.FUNC_SYS: self._packet_sys  # SYS is the battery voltage.
+        }
 
         # ------------------    
         return
@@ -113,7 +118,7 @@ class BoardSDK:
                         else :                     self.state = FSM.START_BYTE_1 
                         continue
                     elif self.state == FSM.FUNCTION_BYTE:
-                        if byte < Functions.FUNC_NONE:
+                        if byte < Functions.FUNC_NONE.value:
                             self.frame = [byte, 0]
                             self.state = FSM.LENGTH_BYTE
                         else :                     self.state = FSM.START_BYTE_1
@@ -131,7 +136,6 @@ class BoardSDK:
                         continue
                     elif self.state == FSM.CHECKSUM_BYTE:
                         if checksum_crc8(bytes(self.frame)) == byte:
-                            print(self.frame)
                             _function = Functions(self.frame[0])
                             _data     = bytes(self.frame[2:])
                             if _function in self.parsers: self.parsers[_function](_data)
@@ -140,27 +144,28 @@ class BoardSDK:
                         self.state = FSM.START_BYTE_1
                         continue
                  # END LOOP OVER BYTES IN THE PACKET   
-                print(packet)
             # ------------------------------------------------------------------
             else:
                 time.sleep(0.01)
-        self.port.close()   
         return
 
 
     def stop_BoardSDK(self):
         """
-        Stop the listening thread.
+        Stop the listening thread and close the serial port.
+        To conintue with the main program, a new BoardSDK must be created.
         First, break the loop in listen_thread, which will close the serial port.
         Second, wait for the thread to complete 
         """
         if self.enable_recv:
             self.stop_listening = True
-            self.enable_recv = False
+            self.enable_recv    = False
             self.listening.join()
             self.logger.info("Stopped listening thread.")
         else: 
             self.logger.warning(f"Reception was not enabled to stop the listening thread.")
+        self.port.close()
+        self.logger.info("Closed serial port.")
         return
 
     def get_battery(self):
@@ -172,9 +177,13 @@ class BoardSDK:
         :rtype: unsigned short
         """
         if self.enable_recv:
-            d = self.queue_sys.get(block=False)
+            d = self.queue_sys[0]
+            if len(d) == 0 :
+                self.logger.warning(f"Battery data corrupted")
+                return None
             if d[0] == self.MAGIC_BATTERY:
-                return struct.unpack('<H', data[1:])[0] # unsigned short
+                v = struct.unpack('<H', d[1:])[0] # unsigned short
+                return v/1000.0
             else:
                 self.logger.warning(f"Battery data corrupted")
                 return None
@@ -315,16 +324,23 @@ class BoardSDK:
             raise
 
 if __name__ == "__main__":
-    board = BoardSDK()
+    board = BoardSDK(enable_recv=True)
     
     board.set_rgb([(1,0,100,0)])
-    time.sleep(0.1)
+    time.sleep(0.5)
 
+    #board.set_led(1.0,1.0,20,1)
+    #time.sleep(1.5)
+    
     board.set_buzzer(2400, 0.1, 0.9, 1)
-    time.sleep(0.1)
+    time.sleep(0.5)
     
     v = board.get_battery()
-    print(v)
+    if v != None : print(f"Battery : {v:4.3f} V")
     time.sleep(0.1)
+    
+    board.set_motor_duty([(1,20.0),(2,20.0),(3,20.0),(4,20.0)])
+    time.sleep(1.0)
+    board.set_motor_duty([(1,0.0),(2,0.0),(3,0.0),(4,0.0)])
 
     board.stop_BoardSDK()
