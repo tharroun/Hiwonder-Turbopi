@@ -75,6 +75,10 @@ class BoardSDK:
         """
         self.enable_recv = enable_recv
         if enable_recv:
+            self.parsers = {
+                Functions.FUNC_SYS: self._packet_sys  # SYS is the battery voltage.
+            }
+            
             self.stop_listening = False
             self.listening = threading.Thread(target=self._listen_thread, daemon=False)
             self.frame          = []
@@ -86,9 +90,7 @@ class BoardSDK:
             self.logger.info("Started listening to serial port.")
             
         
-        self.parsers = {
-            Functions.FUNC_SYS: self._packet_sys  # SYS is the battery voltage.
-        }
+
 
         # ------------------    
         return
@@ -172,14 +174,14 @@ class BoardSDK:
         """
         Reads the current battery voltage in the sys queue
 
-        :returns: Currently returns the value of the battery voltage data. Not certain of units at this point
+        :returns: The battery voltage.
         :returns: None if the packet was not correct, or if receivng is turned off.
         :rtype: unsigned short
         """
         if self.enable_recv:
             d = self.queue_sys[0]
             if len(d) == 0 :
-                self.logger.warning(f"Battery data corrupted")
+                self.logger.warning(f"Battery data not there")
                 return None
             if d[0] == self.MAGIC_BATTERY:
                 v = struct.unpack('<H', d[1:])[0] # unsigned short
@@ -326,7 +328,7 @@ class BoardSDK:
 if __name__ == "__main__":
     board = BoardSDK(enable_recv=True)
     
-    board.set_rgb([(1,0,100,0)])
+    board.set_rgb([(1,0,10,0)])
     time.sleep(0.5)
 
     #board.set_led(1.0,1.0,20,1)
@@ -339,7 +341,7 @@ if __name__ == "__main__":
     if v != None : print(f"Battery : {v:4.3f} V")
     time.sleep(0.1)
     
-    board.set_motor_duty([(1,20.0),(2,20.0),(3,20.0),(4,20.0)])
+    board.set_motor_duty([(1,17.0),(2,17.0),(3,17.0),(4,17.0)])
     time.sleep(1.0)
     board.set_motor_duty([(1,0.0),(2,0.0),(3,0.0),(4,0.0)])
 
