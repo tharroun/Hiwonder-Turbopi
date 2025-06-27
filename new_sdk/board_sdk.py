@@ -3,7 +3,6 @@ import struct
 import time
 import serial
 import threading
-
 from typing import List, Tuple
 import collections
 
@@ -12,26 +11,42 @@ from check_sum import checksum_crc8
 
 from enum import Enum
 
+"""
+These function codes correspond to the board's functions, and are used in
+communication data packets.
+"""
 class Functions(Enum):
+    FUNC_SYS:    int = 0    # SYS is the battery voltage.
     FUNC_LED:    int = 1
     FUNC_BUZZER: int = 2
     FUNC_MOTOR:  int = 3
     FUNC_RGB:    int = 11
+    FUNC_NONE:   int = 12
 
+"""
+Finite state machine codes refer to the expected bytes
+in communication data packets
+"""
+class FSM(Enum):
+    START_BYTE_1:  int = 0
+    START_BYTE_2:  int = 1
+    FUNCTION_BYTE: int = 2
+    LENGTH_BYTE:   int = 3
+    ID_BYTE:       int = 4
+    DATA_BYTES:    int = 5
+    CHECKSUM_BYTE: int = 6
 
 class BoardSDK:
     """
-    Represents a controller board with functionality to set RGB LEDs, buzzer, and motors.
-
-    June 2025 TAH
-    Adding a listener to the serial communications.
+    Represents a controller board with functionality to set RGB LEDs, buzzer, battery, and motors.
     """
 
     MAGIC_HEADER_1 = 0xAA
     MAGIC_HEADER_2 = 0x55
+    MAGIC_BATTERY  = 0x04
 
     def __init__(
-        self, device: str = "/dev/ttyAMA0", baudrate: int = 1000000, timeout: int = 5
+        self, device: str = "/dev/ttyAMA0", baudrate: int = 1000000, timeout: int = 5, enable_recv: bool = True
     ):
         """
         Initialize the board with a serial connection.
@@ -41,9 +56,6 @@ class BoardSDK:
         :param timeout: Timeout in seconds for serial communication.
         """
         self.logger = logging.getLogger(__name__)
-        self.enable_recv = False
-        self.frame = []
-        self.recv_count = 0
 
         try:
             self.port = serial.Serial(None, baudrate=baudrate, timeout=timeout)
@@ -56,37 +68,121 @@ class BoardSDK:
             raise RuntimeError(f"Failed to initialize serial port: {e}")
         
         """
-        Adding thread to listen on the serial port
+        Added thread to listen on the serial port
+        Added queue for the data (battery) 
         """
-        self.listening = threading.Thread(target=self.listen_thread, daemon=True).start()
-        self.stop_listening = False
-        self.q              = collections.deque(maxlen=1)
-        self.q.append(0)
+        if enable_recv :
+            self.enable_recv = enable_recv
+            self.listening = threading.Thread(target=self._listen_thread, daemon=True).start()
+            self.stop_listening = False
+            self.frame          = []
+            self.bytes_received = 0
+            self.state          = FSM.START_BYTE_1
+            self.queue_sys      = collections.deque(maxlen=1)
+            self.queue_sys.append(0)
 
-    def listen_thread(self):
+            self.parsers = {
+                Functions.FUNC_SYS: self._packet_sys  # SYS is the battery voltage.
+            }
+
+        # ------------------    
+        return
+    
+    def _packet_sys(self, data):
         """
-        
+        Handle a FUNC_SYS data packet 
+        """
+        self.queue_sys.append(data)
+        return
+
+    def _listen_thread(self):
+        """
+        Finite state machine for communication from the board.
         """
         while not self.stop_listening:
-            data = self.port.read()
-            if data:
-                print(data)
+            packet = self.port.read()
+            # ------------------------------------------------------------------
+            # Finite state machine to unpack the data packet
+            if packet:
+                for byte in packet:
+                    if self.state == FSM.START_BYTE_1:
+                        if byte == self.MAGIC_HEADER_1: self.state = FSM.START_BYTE_2
+                        continue
+                    elif self.state == FSM.START_BYTE_2:
+                        if byte == self.MAGIC_HEADER_2: self.state = FSM.FUNCTION_BYTE
+                        else :                     self.state = FSM.START_BYTE_1 
+                        continue
+                    elif self.state == FSM.FUNCTION_BYTE:
+                        if byte < Functions.FUNC_NONE:
+                            self.frame = [byte, 0]
+                            self.state = FSM.LENGTH_BYTE
+                        else :                     self.state = FSM.START_BYTE_1
+                        continue
+                    elif self.state == FSM.LENGTH_BYTE:
+                        self.frame[1] = byte
+                        self.bytes_received = 0
+                        if byte == 0:              self.state = FSM.CHECKSUM_BYTE
+                        else:                      self.state = FSM.DATA_BYTES  
+                        continue
+                    elif self.state == FSM.DATA_BYTES:
+                        self.frame.append(byte)
+                        self.bytes_received += 1
+                        if self.bytes_received >= self.frame[1]: self.state = FSM.CHECKSUM_BYTE
+                        continue
+                    elif self.state == FSM.CHECKSUM_BYTE:
+                        if checksum_crc8(bytes(self.frame)) == byte:
+                            print(self.frame)
+                            _function = Functions(self.frame[0])
+                            _data     = bytes(self.frame[2:])
+                            if _function in self.parsers: self.parsers[_function](_data)
+                        else:
+                            self.logger.warning(f"Packet checksum failed : {packet}")
+                        self.state = FSM.START_BYTE_1
+                        continue
+                 # END LOOP OVER BYTES IN THE PACKET   
+                print(packet)
+            # ------------------------------------------------------------------
             else:
                 time.sleep(0.01)
         self.port.close()   
         return
-    
-    def stopBoardSDK(self):
+
+
+    def stop_BoardSDK(self):
         """
         Stop the listening thread.
-        First, break the loop in listen_thread, which will close the port.
+        First, break the loop in listen_thread, which will close the serial port.
         Second, wait for the thread to complete 
         """
-        self.stop_listening = True
-        self.listening.join()
-        print("EXITING")
+        if self.enable_recv:
+            self.stop_listening = True
+            self.enable_recv = False
+            self.listening.join()
+            self.logger.info("Stopped listening thread.")
+        else: 
+            self.logger.warning(f"Reception was not enabled to stop the listening thread.")
         return
 
+    def get_battery(self):
+        """
+        Reads the current battery voltage in the sys queue
+
+        :returns: Currently returns the value of the battery voltage data. Not certain of units at this point
+        :returns: None if the packet was not correct, or if receivng is turned off.
+        :rtype: unsigned short
+        """
+        if self.enable_recv:
+            d = self.queue_sys.get(block=False)
+            if d[0] == self.MAGIC_BATTERY:
+                return struct.unpack('<H', data[1:])[0] # unsigned short
+            else:
+                self.logger.warning(f"Battery data corrupted")
+                return None
+        else:
+            self.logger.warning(f"Reception not enabled to read the battery voltage")
+            return None
+         
+    
     def set_rgb(self, pixels: List[Tuple[int, int, int, int]]) -> None:
         """
         Set the RGB values for the board's LEDs.
@@ -194,7 +290,6 @@ class BoardSDK:
         data[0] = 0x05  # Command ID
         data[1] = len(duty)  # Number of motors
 
-
         offset = 2
         for motor_id, duty_cycle in duty:
             motor_id = motor_id - 1  # Convert to 0-based index
@@ -220,9 +315,16 @@ class BoardSDK:
             raise
 
 if __name__ == "__main__":
-    board = BoardSDK
+    board = BoardSDK()
     
     board.set_rgb([(1,0,100,0)])
     time.sleep(0.1)
-    board.set_buzzer(2400, 0.1, 0.9, 1)
 
+    board.set_buzzer(2400, 0.1, 0.9, 1)
+    time.sleep(0.1)
+    
+    v = board.get_battery()
+    print(v)
+    time.sleep(0.1)
+
+    board.stop_BoardSDK()
