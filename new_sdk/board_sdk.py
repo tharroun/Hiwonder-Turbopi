@@ -5,15 +5,26 @@ import serial
 import threading
 
 from typing import List, Tuple
+import collections
 
 # Fast SDK Utilities
 from check_sum import checksum_crc8
-from functions import Functions
+
+from enum import Enum
+
+class Functions(Enum):
+    FUNC_LED:    int = 1
+    FUNC_BUZZER: int = 2
+    FUNC_MOTOR:  int = 3
+    FUNC_RGB:    int = 11
 
 
 class BoardSDK:
     """
     Represents a controller board with functionality to set RGB LEDs, buzzer, and motors.
+
+    June 2025 TAH
+    Adding a listener to the serial communications.
     """
 
     MAGIC_HEADER_1 = 0xAA
@@ -44,17 +55,36 @@ class BoardSDK:
         except serial.SerialException as e:
             raise RuntimeError(f"Failed to initialize serial port: {e}")
         
-        listening = threading.Thread(target=self.listen_thread, daemon=True).start()
-        time.sleep(0.1)
+        """
+        Adding thread to listen on the serial port
+        """
+        self.listening = threading.Thread(target=self.listen_thread, daemon=True).start()
+        self.stop_listening = False
+        self.q              = collections.deque(maxlen=1)
+        self.q.append(0)
 
     def listen_thread(self):
-        while True:
+        """
+        
+        """
+        while not self.stop_listening:
             data = self.port.read()
             if data:
                 print(data)
             else:
                 time.sleep(0.01)
         self.port.close()   
+        return
+    
+    def stopBoardSDK(self):
+        """
+        Stop the listening thread.
+        First, break the loop in listen_thread, which will close the port.
+        Second, wait for the thread to complete 
+        """
+        self.stop_listening = True
+        self.listening.join()
+        print("EXITING")
         return
 
     def set_rgb(self, pixels: List[Tuple[int, int, int, int]]) -> None:
@@ -188,3 +218,11 @@ class BoardSDK:
         except Exception as e:
             self.logger.error("Failed to send data to port: %s", e, exc_info=True)
             raise
+
+if __name__ == "__main__":
+    board = BoardSDK
+    
+    board.set_rgb([(1,0,100,0)])
+    time.sleep(0.1)
+    board.set_buzzer(2400, 0.1, 0.9, 1)
+

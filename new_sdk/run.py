@@ -1,4 +1,4 @@
-from board_sdk_2 import BoardSDK
+from board_sdk import BoardSDK
 import time
 
 board = BoardSDK()
