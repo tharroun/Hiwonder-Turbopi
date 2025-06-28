@@ -10,7 +10,7 @@ from enum import Enum
 import yaml
 import numpy
 import mypid
-import hw_sdk_robot
+import tah_sdk_board
 import hw_sdk_sonar
 import tah_sdk_mecanum
 import cv2
@@ -46,8 +46,8 @@ looking = CAMERA_ORIENTATION.CENTER
 def robot_servo(qs,robot) -> int:
     global looking
 
-    sx = mypid.mypid(0.15,0.0,0.005)
-    sy = mypid.mypid(0.2,0.0,0.005)
+    sx = mypid.mypid(0.45,0.0,0.005)
+    sy = mypid.mypid(0.3,0.0,0.005)
 
     servo_x_position = servo2_center
     servo_y_position = servo1_center
@@ -63,8 +63,7 @@ def robot_servo(qs,robot) -> int:
         # ----------------------------------------------------------
         # THE TASK
         if data is KILL_THREAD:
-            robot.pwm_servo_set_position(0.05, [[1, servo1_center]])
-            robot.pwm_servo_set_position(0.05, [[2, servo2_center]])
+            robot.set_servo_position(0.1, [[1, servo1_center],[2, servo2_center]])
             qs.task_done()
             break
         elif data is LOST_OBJECT:
@@ -80,7 +79,7 @@ def robot_servo(qs,robot) -> int:
             new_y_position = int(servo_y_position - move_y)
             if new_y_position < 1100 or new_y_position > 1900 : new_y_position = servo_y_position
             # ----------------------------------------------------------
-            robot.pwm_servo_set_position(0.05, [[1, new_y_position],[2, new_x_position]]) 
+            robot.set_servo_position(0.05, [[1, new_y_position],[2, new_x_position]]) 
             servo_x_position = new_x_position
             servo_y_position = new_y_position
             if servo_x_position > 1800 :   looking = CAMERA_ORIENTATION.LEFT
@@ -90,8 +89,7 @@ def robot_servo(qs,robot) -> int:
         qs.task_done()
     
     #-------
-    robot.pwm_servo_set_position(0.05, [[1, servo1_center]])
-    robot.pwm_servo_set_position(0.05, [[2, servo2_center]])
+    robot.set_servo_position(0.1, [[1, servo1_center],[2, servo2_center]])
     return 1 
 # ==============================================================
 
@@ -100,8 +98,8 @@ def robot_servo(qs,robot) -> int:
 def robot_mecanum(qm,robot) -> int:
     global looking
 
-    mr = mypid.mypid(0.0035,0.0,0.0001)
-    mz = mypid.mypid(1.5,0.0,0.0001)
+    mr = mypid.mypid(0.0015,0.0,0.0001)
+    mz = mypid.mypid(1.0,0.0,0.0001)
 
     wheels = tah_sdk_mecanum.Mecanum(robot)
 
@@ -224,23 +222,23 @@ def robot_see(qs,qm,cap) -> int:
 # ==============================================================
 def test_servos(robot) -> int: 
     print("TESTING SERVO 1 UP/DOWN...")
-    robot.pwm_servo_set_position(0.3, [[1, servo2_center]]) 
+    robot.set_servo_position(0.3, [[1, servo2_center]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[1, servo2_center+400]]) 
+    robot.set_servo_position(0.3, [[1, servo2_center+400]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[1, servo2_center-400]]) 
+    robot.set_servo_position(0.3, [[1, servo2_center-400]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[1, servo2_center]]) 
+    robot.set_servo_position(0.3, [[1, servo2_center]]) 
     time.sleep(0.5)
     
     print("TESTING SERVO 2 LEFT/RIGHT...")
-    robot.pwm_servo_set_position(0.3, [[2, servo2_center]]) 
+    robot.set_servo_position(0.3, [[2, servo2_center]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[2, servo2_center+500]]) 
+    robot.set_servo_position(0.3, [[2, servo2_center+500]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[2, servo2_center-500]]) 
+    robot.set_servo_position(0.3, [[2, servo2_center-500]]) 
     time.sleep(0.5)
-    robot.pwm_servo_set_position(0.3, [[2, servo2_center]]) 
+    robot.set_servo_position(0.3, [[2, servo2_center]]) 
     time.sleep(0.5)
     return 0
 # ==============================================================
@@ -267,8 +265,7 @@ def test_sonar(sonar) -> int:
 # ==============================================================
 if __name__ == '__main__':
 
-    robot = hw_sdk_robot.Board()
-    robot.enable_reception()
+    robot = tah_sdk_board.BoardSDK()
     test_board_rgb(robot)
     sonar = hw_sdk_sonar.Sonar()
     test_sonar(sonar)
@@ -296,3 +293,5 @@ if __name__ == '__main__':
     qm.join()
     print(f"Queue Servo   : {qs.qsize()}")
     print(f"Queue Mecanum : {qm.qsize()}")
+    
+    robot.stop_BoardSDK()
